@@ -1,4 +1,4 @@
-const CACHE_NAME = "cyber-memo-cache-v2";
+const CACHE_NAME = "cyber-memo-cache-v3";
 const urlsToCache = [
   "./",
   "./index.html",
