@@ -1,10 +1,10 @@
 {
-  "name": "シンプル手書きメモ帳",
-  "short_name": "手書きメモ帳",
+  "name": "手書き＋テキストメモ帳",
+  "short_name": "メモ帳",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#fff",
-  "theme_color": "#222",
+  "background_color": "#111217",
+  "theme_color": "#181b22",
   "icons": [
     {
       "src": "icon-192.png",
