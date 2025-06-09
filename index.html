@@ -9,27 +9,34 @@
 </head>
 <body>
   <header>
+    <div id="hamburger" class="hamburger">
+      <span></span><span></span><span></span>
+    </div>
     <h1>手書き＋テキストメモ帳</h1>
   </header>
+  <nav id="header-menu" class="menu hidden">
+    <ul id="menu-list">
+      <li id="menu-open-list">メモ一覧</li>
+      <li id="menu-new">新規メモ作成</li>
+      <li id="menu-delete" class="hidden">このメモを削除</li>
+    </ul>
+  </nav>
   <main>
     <section id="memo-list-section">
-      <button id="new-memo-btn">新規メモ作成</button>
-      <div id="tag-filter"></div>
       <ul id="memo-list"></ul>
+      <div id="tag-filter"></div>
     </section>
     <section id="editor-section" class="hidden">
-      <nav id="editor-nav">
-        <button id="back-btn">← 戻る</button>
-        <button id="add-text-btn">テキスト追加</button>
-        <button id="save-btn">保存</button>
-        <button id="delete-btn">削除</button>
-      </nav>
       <div id="draw-area-wrapper">
         <div id="draw-area">
           <canvas id="canvas"></canvas>
           <div id="text-layer"></div>
         </div>
       </div>
+      <nav id="editor-nav">
+        <button id="add-text-btn">テキスト追加</button>
+        <button id="save-btn">保存</button>
+      </nav>
       <div id="tag-area">
         <input id="tag-input" placeholder="タグをカンマ区切りで入力">
         <div id="tag-chips"></div>
