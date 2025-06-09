@@ -62,12 +62,11 @@ function deleteMemo(id) {
 let currentMemo = null;
 let isDrawing = false;
 let lastX, lastY;
+let openedMemoId = null;
 
 const memoListSection = document.getElementById("memo-list-section");
 const editorSection = document.getElementById("editor-section");
 const memoList = document.getElementById("memo-list");
-const newMemoBtn = document.getElementById("new-memo-btn");
-const backBtn = document.getElementById("back-btn");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const textLayer = document.getElementById("text-layer");
@@ -75,21 +74,22 @@ const addTextBtn = document.getElementById("add-text-btn");
 const tagInput = document.getElementById("tag-input");
 const tagChips = document.getElementById("tag-chips");
 const saveBtn = document.getElementById("save-btn");
-const deleteBtn = document.getElementById("delete-btn");
 const tagFilter = document.getElementById("tag-filter");
 const drawArea = document.getElementById("draw-area");
+const hamburger = document.getElementById('hamburger');
+const menu = document.getElementById('header-menu');
+const menuOpenList = document.getElementById('menu-open-list');
+const menuNew = document.getElementById('menu-new');
+const menuDelete = document.getElementById('menu-delete');
 
-// キャンバスサイズをレスポンシブで最大化
 function resizeCanvas() {
   const size = drawArea.offsetWidth;
   canvas.width = size;
   canvas.height = size;
   textLayer.style.width = size + "px";
   textLayer.style.height = size + "px";
-  // 背景再描画
   ctx.fillStyle = "#111217";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  // 既存画像があれば再描画
   if (currentMemo && currentMemo.image) {
     const img = new window.Image();
     img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -130,7 +130,6 @@ canvas.addEventListener("mousemove", e => {
 canvas.addEventListener("mouseup", () => isDrawing = false);
 canvas.addEventListener("mouseleave", () => isDrawing = false);
 
-// タッチ対応
 canvas.addEventListener("touchstart", e => {
   e.preventDefault();
   isDrawing = true;
@@ -149,7 +148,6 @@ canvas.addEventListener("touchmove", e => {
 });
 canvas.addEventListener("touchend", () => isDrawing = false);
 
-// テキストボックス追加
 addTextBtn.onclick = () => {
   const box = document.createElement("textarea");
   box.className = "textbox";
@@ -162,7 +160,6 @@ addTextBtn.onclick = () => {
     box.style.height = "auto";
     box.style.height = (box.scrollHeight) + "px";
   });
-  // ドラッグ移動
   let dragging = false, offsetX = 0, offsetY = 0;
   box.addEventListener("mousedown", e => {
     dragging = true;
@@ -182,7 +179,6 @@ addTextBtn.onclick = () => {
     dragging = false;
     box.style.zIndex = 2;
   });
-  // タッチで移動
   box.addEventListener("touchstart", e => {
     dragging = true;
     const t = e.touches[0];
@@ -241,7 +237,6 @@ function renderTagFilter(memos) {
     };
     tagFilter.appendChild(btn);
   });
-  // すべて表示ボタン
   const allBtn = document.createElement("button");
   allBtn.textContent = "すべて";
   allBtn.onclick = () => renderMemoList(memos);
@@ -275,6 +270,7 @@ function renderTagChips(tags) {
 function openEditor(id = null) {
   showSection(editorSection);
   textLayer.innerHTML = "";
+  openedMemoId = id;
   if (id) {
     getMemo(id).then(memo => {
       currentMemo = Object.assign({}, memo);
@@ -282,6 +278,7 @@ function openEditor(id = null) {
         resizeCanvas();
         loadMemoToEditor(currentMemo);
       }, 50);
+      menuDelete.classList.remove('hidden');
     });
   } else {
     currentMemo = {
@@ -295,6 +292,7 @@ function openEditor(id = null) {
       clearCanvas();
     }, 50);
     renderTagChips([]);
+    menuDelete.classList.add('hidden');
   }
 }
 
@@ -316,7 +314,6 @@ function loadMemoToEditor(memo) {
       box.style.height = "auto";
       box.style.height = (box.scrollHeight) + "px";
     });
-    // ドラッグ移動
     let dragging = false, offsetX = 0, offsetY = 0;
     box.addEventListener("mousedown", e => {
       dragging = true;
@@ -336,7 +333,6 @@ function loadMemoToEditor(memo) {
       dragging = false;
       box.style.zIndex = 2;
     });
-    // タッチで移動
     box.addEventListener("touchstart", e => {
       dragging = true;
       const t = e.touches[0];
@@ -365,9 +361,7 @@ function loadMemoToEditor(memo) {
 }
 
 saveBtn.onclick = async () => {
-  // キャンバス画像を保存
   currentMemo.image = canvas.toDataURL();
-  // テキストボックス情報を保存（位置は比率で保存）
   const boxes = textLayer.querySelectorAll(".textbox");
   currentMemo.texts = Array.from(boxes).map(box => ({
     value: box.value,
@@ -376,22 +370,20 @@ saveBtn.onclick = async () => {
   }));
   await putMemo(currentMemo);
   showSection(memoListSection);
+  menuDelete.classList.add('hidden');
   refreshList();
 };
 
-deleteBtn.onclick = async () => {
-  if (currentMemo.id !== undefined) {
-    await deleteMemo(currentMemo.id);
+menuDelete.onclick = async () => {
+  if (openedMemoId !== null && openedMemoId !== undefined) {
+    if (confirm("このメモを削除しますか？")) {
+      await deleteMemo(openedMemoId);
+      showSection(memoListSection);
+      menuDelete.classList.add('hidden');
+      refreshList();
+    }
   }
-  showSection(memoListSection);
-  refreshList();
 };
-
-backBtn.onclick = () => {
-  showSection(memoListSection);
-};
-
-newMemoBtn.onclick = () => openEditor();
 
 tagInput.addEventListener("keydown", e => {
   if (e.key === "Enter" || e.key === ",") {
@@ -406,11 +398,31 @@ tagInput.addEventListener("keydown", e => {
   }
 });
 
+// ハンバーガーメニュー制御
+hamburger.addEventListener('click', () => {
+  menu.classList.toggle('hidden');
+});
+document.body.addEventListener('click', e => {
+  if (!menu.contains(e.target) && !hamburger.contains(e.target)) {
+    menu.classList.add('hidden');
+  }
+});
+
+// メニュー項目イベント
+menuOpenList.addEventListener('click', () => {
+  showSection(memoListSection);
+  menu.classList.add('hidden');
+  menuDelete.classList.add('hidden');
+});
+menuNew.addEventListener('click', () => {
+  openEditor();
+  menu.classList.add('hidden');
+});
 window.addEventListener("DOMContentLoaded", async () => {
   await openDB();
   refreshList();
-  // PWA登録
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js");
   }
+  showSection(memoListSection);
 });
