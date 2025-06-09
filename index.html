@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>シンプル手書きメモ帳</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>手書きメモ帳</h1>
+  </header>
+  <main id="main">
+    <section id="memo-list-section">
+      <button id="new-memo-btn">新規メモ作成</button>
+      <div id="tag-filter"></div>
+      <ul id="memo-list"></ul>
+    </section>
+    <section id="editor-section" class="hidden">
+      <button id="back-btn">← 戻る</button>
+      <canvas id="canvas" width="320" height="320"></canvas>
+      <textarea id="text-input" placeholder="テキストを入力"></textarea>
+      <div id="tag-area">
+        <input id="tag-input" placeholder="タグをカンマ区切りで入力">
+        <div id="tag-chips"></div>
+      </div>
+      <div class="editor-btns">
+        <button id="save-btn">保存</button>
+        <button id="delete-btn">削除</button>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
