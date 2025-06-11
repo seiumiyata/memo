@@ -81,6 +81,7 @@ const menu = document.getElementById('header-menu');
 const menuOpenList = document.getElementById('menu-open-list');
 const menuNew = document.getElementById('menu-new');
 const menuDelete = document.getElementById('menu-delete');
+const saveToast = document.getElementById("save-toast");
 
 function resizeCanvas() {
   const size = drawArea.offsetWidth;
@@ -360,22 +361,36 @@ function loadMemoToEditor(memo) {
   renderTagChips(memo.tags || []);
 }
 
-// --- 修正ポイント：保存時に新規IDをセット ---
+// --- トースト表示 ---
+function showSaveToast() {
+  saveToast.classList.remove("hidden");
+  setTimeout(() => {
+    saveToast.classList.add("hidden");
+  }, 1000);
+}
+
+// --- 保存ボタン ---
 saveBtn.onclick = async () => {
-  currentMemo.image = canvas.toDataURL();
-  const boxes = textLayer.querySelectorAll(".textbox");
-  currentMemo.texts = Array.from(boxes).map(box => ({
-    value: box.value,
-    left: parseFloat(box.style.left) / canvas.width,
-    top: parseFloat(box.style.top) / canvas.height
-  }));
-  const newId = await putMemo(currentMemo);
-  if (!currentMemo.id) {
-    currentMemo.id = newId; // 新規作成時のみIDをセット
+  try {
+    currentMemo.image = canvas.toDataURL();
+    const boxes = textLayer.querySelectorAll(".textbox");
+    currentMemo.texts = Array.from(boxes).map(box => ({
+      value: box.value,
+      left: parseFloat(box.style.left) / canvas.width,
+      top: parseFloat(box.style.top) / canvas.height
+    }));
+    const newId = await putMemo(currentMemo);
+    if (!currentMemo.id) {
+      currentMemo.id = newId;
+    }
+    showSaveToast();
+    showSection(memoListSection);
+    menuDelete.classList.add('hidden');
+    refreshList();
+  } catch (e) {
+    alert("保存に失敗しました：" + (e.message || e));
+    console.error(e);
   }
-  showSection(memoListSection);
-  menuDelete.classList.add('hidden');
-  refreshList();
 };
 
 menuDelete.onclick = async () => {
