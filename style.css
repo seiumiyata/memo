@@ -222,6 +222,24 @@ button:active {
   background: var(--accent);
   color: #111217;
 }
+.toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #3af9e5;
+  color: #111217;
+  padding: 1em 2em;
+  border-radius: 24px;
+  font-size: 1.1em;
+  opacity: 0.97;
+  z-index: 1000;
+  box-shadow: 0 4px 16px #0008;
+  transition: opacity 0.3s;
+}
+.toast.hidden {
+  display: none;
+}
 @media (max-width: 900px) {
   #draw-area {
     max-width: 96vw;
