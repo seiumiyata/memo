@@ -360,6 +360,7 @@ function loadMemoToEditor(memo) {
   renderTagChips(memo.tags || []);
 }
 
+// --- 修正ポイント：保存時に新規IDをセット ---
 saveBtn.onclick = async () => {
   currentMemo.image = canvas.toDataURL();
   const boxes = textLayer.querySelectorAll(".textbox");
@@ -368,7 +369,10 @@ saveBtn.onclick = async () => {
     left: parseFloat(box.style.left) / canvas.width,
     top: parseFloat(box.style.top) / canvas.height
   }));
-  await putMemo(currentMemo);
+  const newId = await putMemo(currentMemo);
+  if (!currentMemo.id) {
+    currentMemo.id = newId; // 新規作成時のみIDをセット
+  }
   showSection(memoListSection);
   menuDelete.classList.add('hidden');
   refreshList();
