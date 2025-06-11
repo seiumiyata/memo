@@ -1,4 +1,4 @@
-// --- IndexedDBラッパー ---
+// --- IndexedDBラッパー（変更なし） ---
 const DB_NAME = "simple_memo_db";
 const STORE_NAME = "memos";
 let db;
@@ -361,7 +361,6 @@ function loadMemoToEditor(memo) {
   renderTagChips(memo.tags || []);
 }
 
-// --- トースト表示 ---
 function showSaveToast() {
   saveToast.classList.remove("hidden");
   setTimeout(() => {
@@ -369,24 +368,37 @@ function showSaveToast() {
   }, 1000);
 }
 
-// --- 保存ボタン ---
+// --- ★★★ 修正後の保存処理 ★★★ ---
 saveBtn.onclick = async () => {
   try {
-    currentMemo.image = canvas.toDataURL();
+    // 1. 保存するデータを準備
+    const memoToSave = { ...currentMemo };
+    memoToSave.image = canvas.toDataURL();
     const boxes = textLayer.querySelectorAll(".textbox");
-    currentMemo.texts = Array.from(boxes).map(box => ({
+    memoToSave.texts = Array.from(boxes).map(box => ({
       value: box.value,
       left: parseFloat(box.style.left) / canvas.width,
       top: parseFloat(box.style.top) / canvas.height
     }));
-    const newId = await putMemo(currentMemo);
-    if (!currentMemo.id) {
-      currentMemo.id = newId;
+
+    // 2. 新規メモの場合、idをオブジェクトから削除してautoIncrementを確実にする
+    if (memoToSave.id === undefined) {
+      delete memoToSave.id;
     }
+
+    // 3. データベースに保存し、新しいIDを受け取る
+    const savedId = await putMemo(memoToSave);
+
+    // 4. アプリの状態を、返されたIDで必ず更新
+    currentMemo.id = savedId;
+    openedMemoId = savedId;
+
+    // 5. ユーザーへのフィードバックと画面遷移
     showSaveToast();
     showSection(memoListSection);
-    menuDelete.classList.add('hidden');
+    menuDelete.classList.remove('hidden'); // 保存後は削除可能に
     refreshList();
+
   } catch (e) {
     alert("保存に失敗しました：" + (e.message || e));
     console.error(e);
@@ -417,7 +429,6 @@ tagInput.addEventListener("keydown", e => {
   }
 });
 
-// ハンバーガーメニュー制御
 hamburger.addEventListener('click', () => {
   menu.classList.toggle('hidden');
 });
@@ -427,7 +438,6 @@ document.body.addEventListener('click', e => {
   }
 });
 
-// メニュー項目イベント
 menuOpenList.addEventListener('click', () => {
   showSection(memoListSection);
   menu.classList.add('hidden');
