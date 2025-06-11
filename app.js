@@ -1,60 +1,80 @@
-// --- IndexedDBラッパー（変更なし） ---
+// --- IndexedDBラッパー ---
 const DB_NAME = "simple_memo_db";
 const STORE_NAME = "memos";
 let db;
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = e => {
-      db = e.target.result;
-      db.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
-    };
-    req.onsuccess = e => {
-      db = e.target.result;
-      resolve();
-    };
-    req.onerror = e => reject(e);
+    try {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = e => {
+        db = e.target.result;
+        db.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
+      };
+      req.onsuccess = e => {
+        db = e.target.result;
+        resolve();
+      };
+      req.onerror = e => reject(e);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 function getAllMemos() {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = e => reject(e);
+    try {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = e => reject(e);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 function getMemo(id) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.get(id);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = e => reject(e);
+    try {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = e => reject(e);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 function putMemo(memo) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.put(memo);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = e => reject(e);
+    try {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.put(memo);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = e => reject(e);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 function deleteMemo(id) {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror = e => reject(e);
+    try {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = e => reject(e);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -63,6 +83,7 @@ let currentMemo = null;
 let isDrawing = false;
 let lastX, lastY;
 let openedMemoId = null;
+let addTextMode = false; // テキスト追加モード
 
 const memoListSection = document.getElementById("memo-list-section");
 const editorSection = document.getElementById("editor-section");
@@ -84,17 +105,30 @@ const menuDelete = document.getElementById('menu-delete');
 const saveToast = document.getElementById("save-toast");
 
 function resizeCanvas() {
-  const size = drawArea.offsetWidth;
-  canvas.width = size;
-  canvas.height = size;
-  textLayer.style.width = size + "px";
-  textLayer.style.height = size + "px";
-  ctx.fillStyle = "#111217";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  if (currentMemo && currentMemo.image) {
-    const img = new window.Image();
-    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    img.src = currentMemo.image;
+  try {
+    const size = drawArea.offsetWidth;
+    // Canvas内容を一時保存
+    const tmpImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    canvas.width = size;
+    canvas.height = size;
+    textLayer.style.width = size + "px";
+    textLayer.style.height = size + "px";
+    ctx.fillStyle = "#111217";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 画像データがあれば復元
+    if (currentMemo && currentMemo.image) {
+      const img = new window.Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      img.src = currentMemo.image;
+    } else if (tmpImage) {
+      // 手書き途中の内容もリサイズ時に復元
+      try {
+        ctx.putImageData(tmpImage, 0, 0);
+      } catch (e) {}
+    }
+  } catch (e) {
+    alert("キャンバスのリサイズに失敗しました: " + (e.message || e));
+    console.error(e);
   }
 }
 
@@ -120,11 +154,12 @@ function drawLine(x1, y1, x2, y2) {
 
 // 手書きイベント
 canvas.addEventListener("mousedown", e => {
+  if (addTextMode) return; // テキスト追加モード時は無効
   isDrawing = true;
   [lastX, lastY] = [e.offsetX, e.offsetY];
 });
 canvas.addEventListener("mousemove", e => {
-  if (!isDrawing) return;
+  if (!isDrawing || addTextMode) return;
   drawLine(lastX, lastY, e.offsetX, e.offsetY);
   [lastX, lastY] = [e.offsetX, e.offsetY];
 });
@@ -132,6 +167,7 @@ canvas.addEventListener("mouseup", () => isDrawing = false);
 canvas.addEventListener("mouseleave", () => isDrawing = false);
 
 canvas.addEventListener("touchstart", e => {
+  if (addTextMode) return;
   e.preventDefault();
   isDrawing = true;
   const rect = canvas.getBoundingClientRect();
@@ -139,8 +175,8 @@ canvas.addEventListener("touchstart", e => {
   [lastX, lastY] = [t.clientX - rect.left, t.clientY - rect.top];
 });
 canvas.addEventListener("touchmove", e => {
+  if (!isDrawing || addTextMode) return;
   e.preventDefault();
-  if (!isDrawing) return;
   const rect = canvas.getBoundingClientRect();
   const t = e.touches[0];
   const x = t.clientX - rect.left, y = t.clientY - rect.top;
@@ -149,61 +185,94 @@ canvas.addEventListener("touchmove", e => {
 });
 canvas.addEventListener("touchend", () => isDrawing = false);
 
+// --- テキスト追加機能（好きな場所に配置） ---
 addTextBtn.onclick = () => {
-  const box = document.createElement("textarea");
-  box.className = "textbox";
-  box.style.left = "10px";
-  box.style.top = "10px";
-  box.rows = 1;
-  box.value = "";
-  box.setAttribute("draggable", "true");
-  box.addEventListener("input", () => {
-    box.style.height = "auto";
-    box.style.height = (box.scrollHeight) + "px";
-  });
-  let dragging = false, offsetX = 0, offsetY = 0;
-  box.addEventListener("mousedown", e => {
-    dragging = true;
-    offsetX = e.offsetX;
-    offsetY = e.offsetY;
-    box.style.zIndex = 10;
-  });
-  document.addEventListener("mousemove", e => {
-    if (!dragging) return;
-    const rect = textLayer.getBoundingClientRect();
-    let x = e.clientX - rect.left - offsetX;
-    let y = e.clientY - rect.top - offsetY;
-    box.style.left = x + "px";
-    box.style.top = y + "px";
-  });
-  document.addEventListener("mouseup", () => {
-    dragging = false;
-    box.style.zIndex = 2;
-  });
-  box.addEventListener("touchstart", e => {
-    dragging = true;
-    const t = e.touches[0];
-    const rect = box.getBoundingClientRect();
-    offsetX = t.clientX - rect.left;
-    offsetY = t.clientY - rect.top;
-    box.style.zIndex = 10;
-  });
-  document.addEventListener("touchmove", e => {
-    if (!dragging) return;
-    const t = e.touches[0];
-    const rect = textLayer.getBoundingClientRect();
-    let x = t.clientX - rect.left - offsetX;
-    let y = t.clientY - rect.top - offsetY;
-    box.style.left = x + "px";
-    box.style.top = y + "px";
-  });
-  document.addEventListener("touchend", () => {
-    dragging = false;
-    box.style.zIndex = 2;
-  });
-  textLayer.appendChild(box);
-  box.focus();
+  addTextMode = true;
+  drawArea.style.cursor = "crosshair";
 };
+
+canvas.addEventListener("click", e => {
+  if (!addTextMode) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  createTextBox(x, y);
+  addTextMode = false;
+  drawArea.style.cursor = "default";
+});
+canvas.addEventListener("touchend", e => {
+  if (!addTextMode) return;
+  const rect = canvas.getBoundingClientRect();
+  const t = e.changedTouches[0];
+  const x = t.clientX - rect.left;
+  const y = t.clientY - rect.top;
+  createTextBox(x, y);
+  addTextMode = false;
+  drawArea.style.cursor = "default";
+});
+
+function createTextBox(x, y, value = "") {
+  try {
+    const box = document.createElement("textarea");
+    box.className = "textbox";
+    box.style.left = x + "px";
+    box.style.top = y + "px";
+    box.rows = 1;
+    box.value = value;
+    box.setAttribute("draggable", "true");
+    box.addEventListener("input", () => {
+      box.style.height = "auto";
+      box.style.height = (box.scrollHeight) + "px";
+    });
+    // ドラッグ移動
+    let dragging = false, offsetX = 0, offsetY = 0;
+    box.addEventListener("mousedown", e => {
+      dragging = true;
+      offsetX = e.offsetX;
+      offsetY = e.offsetY;
+      box.style.zIndex = 10;
+    });
+    document.addEventListener("mousemove", e => {
+      if (!dragging) return;
+      const rect = textLayer.getBoundingClientRect();
+      let nx = e.clientX - rect.left - offsetX;
+      let ny = e.clientY - rect.top - offsetY;
+      box.style.left = nx + "px";
+      box.style.top = ny + "px";
+    });
+    document.addEventListener("mouseup", () => {
+      dragging = false;
+      box.style.zIndex = 2;
+    });
+    // タッチで移動
+    box.addEventListener("touchstart", e => {
+      dragging = true;
+      const t = e.touches[0];
+      const rect = box.getBoundingClientRect();
+      offsetX = t.clientX - rect.left;
+      offsetY = t.clientY - rect.top;
+      box.style.zIndex = 10;
+    });
+    document.addEventListener("touchmove", e => {
+      if (!dragging) return;
+      const t = e.touches[0];
+      const rect = textLayer.getBoundingClientRect();
+      let nx = t.clientX - rect.left - offsetX;
+      let ny = t.clientY - rect.top - offsetY;
+      box.style.left = nx + "px";
+      box.style.top = ny + "px";
+    });
+    document.addEventListener("touchend", () => {
+      dragging = false;
+      box.style.zIndex = 2;
+    });
+    textLayer.appendChild(box);
+    box.focus();
+  } catch (e) {
+    alert("テキストボックスの作成に失敗しました: " + (e.message || e));
+    console.error(e);
+  }
+}
 
 function showSection(section) {
   memoListSection.classList.add("hidden");
@@ -219,7 +288,10 @@ function renderMemoList(memos, filterTag = null) {
   }
   filtered.forEach(memo => {
     const li = document.createElement("li");
-    li.textContent = (memo.texts && memo.texts.length ? memo.texts.map(t=>t.value).join(" ") : "[手書きのみ]") + (memo.tags && memo.tags.length ? " [" + memo.tags.join(",") + "]" : "");
+    // タイトル：最初のテキスト or [手書きのみ] + 日時
+    let title = (memo.texts && memo.texts.length ? memo.texts[0].value : "[手書きのみ]");
+    if (memo.updatedAt) title += " (" + memo.updatedAt + ")";
+    li.textContent = title + (memo.tags && memo.tags.length ? " [" + memo.tags.join(",") + "]" : "");
     li.onclick = () => openEditor(memo.id);
     memoList.appendChild(li);
   });
@@ -245,9 +317,14 @@ function renderTagFilter(memos) {
 }
 
 async function refreshList() {
-  const memos = await getAllMemos();
-  renderMemoList(memos);
-  renderTagFilter(memos);
+  try {
+    const memos = await getAllMemos();
+    renderMemoList(memos);
+    renderTagFilter(memos);
+  } catch (e) {
+    alert("メモ一覧の取得に失敗しました: " + (e.message || e));
+    console.error(e);
+  }
 }
 
 function renderTagChips(tags) {
@@ -280,13 +357,18 @@ function openEditor(id = null) {
         loadMemoToEditor(currentMemo);
       }, 50);
       menuDelete.classList.remove('hidden');
+    }).catch(e => {
+      alert("メモの取得に失敗しました: " + (e.message || e));
+      console.error(e);
     });
   } else {
     currentMemo = {
       id: undefined,
       image: "",
       texts: [],
-      tags: []
+      tags: [],
+      createdAt: undefined,
+      updatedAt: undefined
     };
     setTimeout(() => {
       resizeCanvas();
@@ -305,58 +387,7 @@ function loadMemoToEditor(memo) {
     img.src = memo.image;
   }
   (memo.texts || []).forEach(t => {
-    const box = document.createElement("textarea");
-    box.className = "textbox";
-    box.value = t.value;
-    box.style.left = (t.left * canvas.width) + "px";
-    box.style.top = (t.top * canvas.height) + "px";
-    box.rows = 1;
-    box.addEventListener("input", () => {
-      box.style.height = "auto";
-      box.style.height = (box.scrollHeight) + "px";
-    });
-    let dragging = false, offsetX = 0, offsetY = 0;
-    box.addEventListener("mousedown", e => {
-      dragging = true;
-      offsetX = e.offsetX;
-      offsetY = e.offsetY;
-      box.style.zIndex = 10;
-    });
-    document.addEventListener("mousemove", e => {
-      if (!dragging) return;
-      const rect = textLayer.getBoundingClientRect();
-      let x = e.clientX - rect.left - offsetX;
-      let y = e.clientY - rect.top - offsetY;
-      box.style.left = x + "px";
-      box.style.top = y + "px";
-    });
-    document.addEventListener("mouseup", () => {
-      dragging = false;
-      box.style.zIndex = 2;
-    });
-    box.addEventListener("touchstart", e => {
-      dragging = true;
-      const t = e.touches[0];
-      const rect = box.getBoundingClientRect();
-      offsetX = t.clientX - rect.left;
-      offsetY = t.clientY - rect.top;
-      box.style.zIndex = 10;
-    });
-    document.addEventListener("touchmove", e => {
-      if (!dragging) return;
-      const t = e.touches[0];
-      const rect = textLayer.getBoundingClientRect();
-      let x = t.clientX - rect.left - offsetX;
-      let y = t.clientY - rect.top - offsetY;
-      box.style.left = x + "px";
-      box.style.top = y + "px";
-    });
-    document.addEventListener("touchend", () => {
-      dragging = false;
-      box.style.zIndex = 2;
-    });
-    textLayer.appendChild(box);
-    box.focus();
+    createTextBox(t.left * canvas.width, t.top * canvas.height, t.value);
   });
   renderTagChips(memo.tags || []);
 }
@@ -368,10 +399,17 @@ function showSaveToast() {
   }, 1000);
 }
 
-// --- ★★★ 修正後の保存処理 ★★★ ---
+// --- 保存ボタン ---
 saveBtn.onclick = async () => {
   try {
-    // 1. 保存するデータを準備
+    // 日時を記録
+    const now = new Date();
+    if (!currentMemo.createdAt) {
+      currentMemo.createdAt = now.toLocaleString();
+    }
+    currentMemo.updatedAt = now.toLocaleString();
+
+    // 保存するデータを準備
     const memoToSave = { ...currentMemo };
     memoToSave.image = canvas.toDataURL();
     const boxes = textLayer.querySelectorAll(".textbox");
@@ -381,22 +419,17 @@ saveBtn.onclick = async () => {
       top: parseFloat(box.style.top) / canvas.height
     }));
 
-    // 2. 新規メモの場合、idをオブジェクトから削除してautoIncrementを確実にする
     if (memoToSave.id === undefined) {
       delete memoToSave.id;
     }
 
-    // 3. データベースに保存し、新しいIDを受け取る
     const savedId = await putMemo(memoToSave);
-
-    // 4. アプリの状態を、返されたIDで必ず更新
     currentMemo.id = savedId;
     openedMemoId = savedId;
 
-    // 5. ユーザーへのフィードバックと画面遷移
     showSaveToast();
     showSection(memoListSection);
-    menuDelete.classList.remove('hidden'); // 保存後は削除可能に
+    menuDelete.classList.remove('hidden');
     refreshList();
 
   } catch (e) {
@@ -408,10 +441,15 @@ saveBtn.onclick = async () => {
 menuDelete.onclick = async () => {
   if (openedMemoId !== null && openedMemoId !== undefined) {
     if (confirm("このメモを削除しますか？")) {
-      await deleteMemo(openedMemoId);
-      showSection(memoListSection);
-      menuDelete.classList.add('hidden');
-      refreshList();
+      try {
+        await deleteMemo(openedMemoId);
+        showSection(memoListSection);
+        menuDelete.classList.add('hidden');
+        refreshList();
+      } catch (e) {
+        alert("削除に失敗しました: " + (e.message || e));
+        console.error(e);
+      }
     }
   }
 };
@@ -448,10 +486,15 @@ menuNew.addEventListener('click', () => {
   menu.classList.add('hidden');
 });
 window.addEventListener("DOMContentLoaded", async () => {
-  await openDB();
-  refreshList();
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js");
+  try {
+    await openDB();
+    refreshList();
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js");
+    }
+    showSection(memoListSection);
+  } catch (e) {
+    alert("アプリの初期化に失敗しました: " + (e.message || e));
+    console.error(e);
   }
-  showSection(memoListSection);
 });
